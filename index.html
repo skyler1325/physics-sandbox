@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pixel poxel mixel moxel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Silkscreen&family=Knewave&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: "Silkscreen", sans-serif;
+    }
+
+    canvas {
+      cursor: none;
+    }
+
+    #gui {
+      width: 450px;
+      height: 100vh;
+      display: flex;
+      flex-direction: row-reverse;
+      position: absolute;
+      left: 100vw;
+      transform: translateX(-100%);
+    }
+
+    #list {
+      width: 75%;
+      height: 100%;
+      display: inline-grid;
+      grid-template-columns: auto auto;
+      grid-auto-rows: min-content;
+      background-color: #faf4eb;
+      border-left: 10px solid #ecd7c3;
+      overflow-y: scroll;
+    }
+
+    #list > div {
+      background-color: #f8f5f0;
+      border: 10px solid #f1e1d2;
+      display: flex;
+      flex-direction: column;
+      margin: 10px;
+      border-radius: 5px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    #list > div:hover {
+      filter: brightness(95%);
+    }
+
+    #list > div > div {
+      margin: auto;
+      min-width: 90px;
+      aspect-ratio: 1 / 1;
+      border-radius: 3px;
+    }
+
+    #categories {
+      width: 25%;
+      height: fit-content;
+      display: flex;
+      flex-direction: row-reverse;
+      flex-wrap: wrap;
+    }
+
+    #categories div {
+      width: fit-content;
+      background-color: #faf4eb;
+      border: 10px solid #ecd7c3;
+      user-select: none;
+      font-size: 35px;
+      font-weight: bolder;
+      padding: 15px;
+      border-top-left-radius: 10px;
+      border-bottom-left-radius: 10px;
+      transform: translateX(10px);
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    #categories .unselected:hover {
+      filter: brightness(95%);
+    }
+  </style>
+</head>
+<body>
+  <div id="gui">
+    <div id="list">
+      <div onclick="currentMaterial = 12">
+        <div style="background-color: hsla(6.974, 88.27%, 54.66%, 0.79)"></div>
+        <p>FIRE</p>
+      </div>
+      <div onclick="currentMaterial = 13">
+        <div style="background-color: hsla(180.93, 70.01%, 50.88%, 0.72)"></div>
+        <p>BLUE FIRE</p>
+      </div>
+    </div>
+    <div id="categories">
+      <div onclick="currentCategory = 1; changeCategory()" class="unselected">Solids</div>
+      <div onclick="currentCategory = 2; changeCategory()" class="unselected">Powders</div>
+      <div onclick="currentCategory = 3; changeCategory()" class="unselected">Liquids</div>
+      <div onclick="currentCategory = 4; changeCategory()" class="unselected">Gases</div>
+      <div onclick="currentCategory = 5; changeCategory()">Misc</div>
+    </div>
+  </div>
+
+  <canvas width="1358" height="642"></canvas>
+
+  <script>
+    const canvas = document.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    const categories = document.getElementById("categories");
+    const list = document.getElementById("list");
+
+    function getPixel(x, y) {
+      let result = { bool: false, index: null };
+      points.forEach((point, index) => {
+        if (point.x === x && point.y === y) {
+          result = { bool: true, index: index };
+        }
+      });
+      return result;
+    }
+
+    function getPixelNoPassives(x, y) {
+      let returnValue = { bool: false, index: null };
+      if (getPixel(x, y).bool && materials[points[getPixel(x, y).index].material].state !== "liquid") {
+        returnValue = getPixel(x, y);
+      }
+      return returnValue;
+    }
+
+    function fireCheck(point) {
+      let listOfIndexes = [];
+
+      // Layer above
+      [
+        [-pointSize, -pointSize],
+        [0, -pointSize],
+        [pointSize, -pointSize],
+        [-pointSize, 0],
+        [pointSize, 0],
+        [-pointSize, pointSize],
+        [0, pointSize],
+        [pointSize, pointSize]
+      ].forEach(([dx, dy]) => {
+        const px = point.x + dx;
+        const py = point.y + dy;
+        const pixel = getPixel(px, py);
+        if (pixel.bool && materials[points[pixel.index].material].flammability > 0) {
+          listOfIndexes.push(pixel.index);
+        }
+      });
+
+      return listOfIndexes;
+    }
+  </script>
+</body>
+</html>
