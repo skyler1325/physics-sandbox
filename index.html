@@ -4,185 +4,122 @@
   <meta charset="UTF-8" />
   <title>Gooblet Sandbox</title>
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    canvas { border: 1px solid #888; display: block; margin: auto; cursor: none; background: #f9f9f9; }
-    #gui {
-      position: fixed; top: 0; right: 0; width: 300px; height: 100vh;
-      background: #fff; overflow-y: auto; border-left: 2px solid #ccc; padding: 10px;
-    }
-    h2 { margin-top: 0; }
-    .editor-section { margin-bottom: 15px; }
-    #mat-preview { width: 50px; height: 50px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
-    .button-group button { margin: 5px 5px 0 0; }
+    body { margin: 0; font-family: sans-serif; background: #111; color: #eee; }
+    canvas { display: block; margin: auto; background: black; }
+    #toolbar, #editor { padding: 1em; background: #222; text-align: center; }
+    button, input, select { margin: 0.25em; }
+    #editor { display: none; border-top: 1px solid #444; }
   </style>
 </head>
 <body>
-  <canvas id="canvas" width="800" height="600"></canvas>
-  <div id="gui">
-    <h2>🎨 Custom Material Editor</h2>
-    <div class="editor-section">
-      <label>Name: <input type="text" id="mat-name" /></label>
-    </div>
-    <div class="editor-section">
-      <label>Color: <input type="color" id="mat-color" /></label>
-      <div id="mat-preview"></div>
-    </div>
-    <div class="editor-section">
-      <label>Density: <input type="range" id="mat-density" min="0" max="100" /></label>
-    </div>
-    <div class="editor-section">
-      <label>Flammability: <input type="range" id="mat-flame" min="0" max="100" /></label>
-    </div>
-    <div class="editor-section">
-      <label>State:
-        <select id="mat-state">
-          <option value="solid">Solid</option>
-          <option value="liquid">Liquid</option>
-          <option value="gas">Gas</option>
-          <option value="powder">Powder</option>
-        </select>
-      </label>
-    </div>
-    <div class="button-group">
-      <button onclick="saveMaterial()">Save Material</button>
-      <button onclick="undo()">Undo</button>
-      <button onclick="redo()">Redo</button>
-      <button onclick="saveScene()">💾 Save</button>
-      <button onclick="loadScene()">📂 Load</button>
-    </div>
+  <canvas id="canvas" width="400" height="400"></canvas>
+
+  <div id="toolbar">
+    <button onclick="toggleEditor()">🧪 Edit Materials</button>
+    <button onclick="downloadScene()">⬇️ Download</button>
+    <button onclick="saveLocal()">💾 Save</button>
+    <button onclick="loadScene()">📂 Load</button>
+    <button onclick="undo()">Undo</button>
+  </div>
+
+  <div id="editor">
+    <h3>Material Editor</h3>
+    Name: <input id="matName">
+    Color: <input type="color" id="matColor">
+    Density: <input type="number" id="matDensity">
+    Flammability: <input type="number" id="matFlame">
+    State:
+    <select id="matState">
+      <option value="solid">Solid</option>
+      <option value="liquid">Liquid</option>
+      <option value="powder">Powder</option>
+    </select>
+    <button onclick="saveMaterial()">Save Material</button>
   </div>
 
   <script>
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    const preview = document.getElementById("mat-preview");
-
-    let materials = [];
-    let points = [];
-    let undoStack = [];
-    let redoStack = [];
-
-    const VILLAGE_CENTER = { x: 400, y: 300 };
-
-    class Particle {
-      constructor(x, y, material) {
-        this.x = x;
-        this.y = y;
-        this.material = material;
-      }
-    }
-
-    function saveMaterial() {
-      const name = matName().toLowerCase();
-      const color = document.getElementById("mat-color").value;
-      const density = +document.getElementById("mat-density").value;
-      const flame = +document.getElementById("mat-flame").value;
-      const state = document.getElementById("mat-state").value;
-
-      materials.push({ name, color, density, flammability: flame, state });
-      alert("Material '" + name + "' saved.");
-    }
-
-    function getPixel(x, y) {
-      return points.find(p => p.x === x && p.y === y);
-    }
-
-    function scan(p, range, targetName) {
-      for (let dx = -range; dx <= range; dx++) {
-        for (let dy = -range; dy <= range; dy++) {
-          const tx = p.x + dx;
-          const ty = p.y + dy;
-          const test = getPixel(tx, ty);
-          if (test && materials[test.material].name === targetName) {
-            return test;
-          }
-        }
-      }
-      return null;
-    }
-
-    function updateGooblet(p) {
-      const fire = scan(p, 10, "fire");
-      const water = scan(p, 15, "water");
-      const buddy = scan(p, 5, "gooblet");
-
-      if (fire) {
-        p.x += Math.sign(p.x - fire.x);
-        p.y += Math.sign(p.y - fire.y);
-      } else if (water) {
-        materials[water.material].density = Math.max(0, materials[water.material].density - 1);
-      } else if (buddy) {
-        p.x += Math.sign(buddy.x - p.x);
-        p.y += Math.sign(buddy.y - p.y);
-      } else {
-        p.x += Math.sign(VILLAGE_CENTER.x - p.x);
-        p.y += Math.sign(VILLAGE_CENTER.y - p.y);
-      }
-    }
+    let points = [], history = [], materials = {};
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       points.forEach(p => {
-        const m = materials[p.material];
-        ctx.fillStyle = m.color;
-        ctx.fillRect(p.x, p.y, 3, 3);
-        if (m.name === "gooblet") updateGooblet(p);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 2, 2);
+      });
+    }
+
+    function simulate() {
+      points.forEach(p => {
+        const mat = materials[p.material];
+        if (!mat) return;
+        if (mat.state === "liquid" || mat.state === "powder") {
+          p.y = Math.min(p.y + 1, canvas.height - 2);
+        }
       });
     }
 
     function tick() {
+      simulate();
       draw();
       requestAnimationFrame(tick);
     }
 
-    function undo() {
-      if (undoStack.length) {
-        redoStack.push([...points]);
-        points = undoStack.pop();
-      }
+    function toggleEditor() {
+      const editor = document.getElementById("editor");
+      editor.style.display = editor.style.display === "none" ? "block" : "none";
     }
 
-    function redo() {
-      if (redoStack.length) {
-        undoStack.push([...points]);
-        points = redoStack.pop();
-      }
+    function saveMaterial() {
+      const name = matName.value.trim();
+      if (!name) return alert("Material needs a name.");
+      materials[name] = {
+        color: matColor.value,
+        density: parseFloat(matDensity.value),
+        flammability: parseFloat(matFlame.value),
+        state: matState.value
+      };
+      alert(`Material "${name}" saved.`);
     }
 
-    function saveScene() {
-      localStorage.setItem("goob-scene", JSON.stringify(points));
-      alert("Scene saved.");
+    function downloadScene() {
+      const blob = new Blob([JSON.stringify(points)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "gooblet-scene.json";
+      link.click();
+    }
+
+    function saveLocal() {
+      localStorage.setItem("goobletScene", JSON.stringify(points));
+      alert("Saved to localStorage.");
     }
 
     function loadScene() {
-      const data = localStorage.getItem("goob-scene");
+      const data = localStorage.getItem("goobletScene");
       if (data) {
         points = JSON.parse(data);
         alert("Scene loaded.");
       }
     }
 
-    function matName() {
-      return document.getElementById("mat-name").value;
+    function undo() {
+      if (history.length > 0) {
+        points = history.pop();
+        draw();
+      }
     }
-
-    preview.style.backgroundColor = document.getElementById("mat-color").value;
-    document.getElementById("mat-color").addEventListener("input", e => {
-      preview.style.backgroundColor = e.target.value;
-    });
 
     canvas.addEventListener("click", e => {
       const rect = canvas.getBoundingClientRect();
       const x = Math.floor(e.clientX - rect.left);
       const y = Math.floor(e.clientY - rect.top);
-      const currentMat = materials.find(m => m.name === matName().toLowerCase());
-      if (!currentMat) {
-        alert("Select or create a material first.");
-        return;
-      }
-
-      undoStack.push([...points]);
-      points.push(new Particle(x, y, materials.indexOf(currentMat)));
+      const matKeys = Object.keys(materials);
+      if (matKeys.length === 0) return alert("Create a material first!");
+      const mat = materials[matKeys[0]]; // default to first material
+      history.push([...points]);
+      points.push({ x, y, color: mat.color, material: matKeys[0] });
     });
 
     tick();
